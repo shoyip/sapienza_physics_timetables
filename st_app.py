@@ -8,8 +8,18 @@ from io import StringIO
 import re
 from datetime import date, datetime, timedelta
 
+st.set_page_config(page_title="Physics Timetables at Sapienza")
+
 st.title("Timetables - Department of Physics @ Sapienza")
 
+st.markdown("""
+![Sapienza University of Rome logo](sapienza_logo.png)
+
+This app allows you to generate timetables for
+Sapienza University of Rome lectures at the Department of
+Physics. It is currently updated to [the 21/09 version](https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html)".
+The app is maintained by [Shoichi Yip](https://github.com/shoyip).
+""")
 
 def to_date(date_string):
     return datetime.strptime(date_string, "%d/%m/%Y")
@@ -166,7 +176,8 @@ def get_timetable(input_df):
 
 
 raw_df = load_data(
-    "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/Orario_I_semestre_23_24.html"
+    #"https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/Orario_I_semestre_23_24.html"
+    "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html"
 )
 raw_df.set_index("Title", inplace=True)
 
