@@ -10,14 +10,14 @@ from datetime import date, datetime, timedelta
 
 st.set_page_config(page_title="Physics Timetables at Sapienza")
 
-st.title("Timetables - Department of Physics @ Sapienza")
+st.title("Timetables - Department of Physics")
 
 st.markdown("""
-![Sapienza University of Rome logo](sapienza_logo.png)
+![Sapienza University of Rome logo](https://www.phys.uniroma1.it/fisica/sites/all/themes/sapienza_bootstrap/logo.png)
 
 This app allows you to generate timetables for
 Sapienza University of Rome lectures at the Department of
-Physics. It is currently updated to [the 21/09 version](https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html)".
+Physics. It is currently updated to [the 21/09 version](https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html).
 The app is maintained by [Shoichi Yip](https://github.com/shoyip).
 """)
 
