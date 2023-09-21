@@ -1,0 +1,10 @@
+# Sapienza Physics Timetables
+
+This Streamlit app allows users to build Excel files of the current
+timetable of Sapienza University of Rome - Department of Physics
+lectures, and also will allow in the future to export these events
+as iCal files.
+
+---
+
+(c) Shoichi Yip 2023
