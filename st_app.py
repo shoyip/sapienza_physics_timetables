@@ -7,26 +7,30 @@ import pandas as pd
 from io import StringIO
 import re
 from datetime import date, datetime, timedelta
+import icalendar as ical
 
 st.set_page_config(page_title="Physics Timetables at Sapienza")
 
 st.title("Timetables - Department of Physics")
 
-st.markdown("""
+st.markdown(
+    """
 ![Sapienza University of Rome logo](https://www.phys.uniroma1.it/fisica/sites/all/themes/sapienza_bootstrap/logo.png)
 
 This app allows you to generate timetables for
 Sapienza University of Rome lectures at the Department of
 Physics. It is currently updated to [the 21/09 version](https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html).
 The app is maintained by [Shoichi Yip](https://github.com/shoyip).
-""")
+"""
+)
+
 
 def to_date(date_string):
     return datetime.strptime(date_string, "%d/%m/%Y")
 
 
 semester_start = to_date("25/09/2023")
-semester_end = to_date("24/01/2024")
+semester_end = to_date("23/12/2023")
 festivities = list(
     map(
         to_date,
@@ -129,16 +133,88 @@ def get_ttrecords(tt_string):
     return records
 
 
-def get_timetable(input_df):
+def get_reclist(input_df):
     # transform raw df in list of records
-    list_of_recs = list(
+    #input_df.reset_index(drop=False, inplace=True)
+    st.write(input_df)
+    reclist = list(
         pd.concat(
-            [input_df["Title"], input_df.drop(columns=["Title"]).applymap(get_ttrecords)],
+            [
+                input_df["Title"],
+                input_df.drop(columns=["Title"]).applymap(get_ttrecords),
+            ],
             axis=1,
         )
         .melt("Title")
         .to_records(index=False)
     )
+    return reclist
+
+
+def get_first_day(start_date, day_of_week):
+    # given a start_date get the next available date for the specified day of the week
+    current_date = start_date
+    while current_date.weekday() != day_of_week:
+        current_date += timedelta(days=1)
+    return current_date
+
+
+def get_cal(input_df, semester_start, semester_end):
+    reclist = get_reclist(input_df)
+    days_of_week = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
+    dow_str_num = {dow_str: idx for idx, dow_str in enumerate(days_of_week)}
+    cal = ical.Calendar()
+    cal.add(
+        "prodid",
+        "-//Calendario Didattico Sapienza Dipartimento di Fisica//www.uniroma1.it",
+    )
+    cal.add("version", "1.0")
+
+    for rec in reclist:
+        if len(rec[2]) > 0:
+            title = rec[0]
+            day_of_week = dow_str_num[rec[1]]
+            entry = rec[2]
+            # propagate start date of second entry option as end date of first entry option
+            if len(entry) == 2:
+                entry[0]["end_date"] = entry[1]["start_date"]
+            # now let us create the events
+            for entry_option in entry:
+                if "start_date" in entry_option:
+                    start_date = entry_option["start_date"]
+                    event_date = get_first_day(start_date, day_of_week)
+                else:
+                    event_date = get_first_day(semester_start, day_of_week)
+
+                start_hour = entry_option["start_hour"]
+                end_hour = entry_option["end_hour"]
+
+                start_dt = event_date + timedelta(hours=start_hour)
+                end_dt = event_date + timedelta(hours=end_hour)
+
+                if ("end_date" in entry_option):
+                    if (entry_option["end_date"] < semester_end):
+                        end_recurrence = entry_option["end_date"]
+                else:
+                    end_recurrence = semester_end
+
+                ev = ical.Event()
+                ev.add("name", title)
+                ev.add("summary", title)
+                ev.add("description", title)
+                ev.add("location", entry_option["room"])
+                ev.add("dtstart", start_dt)
+                ev.add("dtend", end_dt)
+                ev.add("rrule", {"freq": "weekly", "until": end_recurrence})
+                # exdates should have the SAME format of dtstart and same HOUR as well (doesn't work)
+                # for festivity in festivities:
+                # ev.add('exdate', festivity + timedelta(hours=start_hour))
+                cal.add_component(ev)
+    return cal
+
+
+def get_timetable(input_df):
+    list_of_recs = get_reclist(input_df)
 
     # intialize timetable with blank strings
     lovs = ["" for i in range(24)]
@@ -176,48 +252,68 @@ def get_timetable(input_df):
 
 
 raw_df = load_data(
-    #"https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/Orario_I_semestre_23_24.html"
+    # "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/Orario_I_semestre_23_24.html"
     "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html"
 )
 raw_df.set_index("Title", inplace=True)
 
-#st.subheader("Data")
-#st.write(raw_df)
+# st.subheader("Data")
+# st.write(raw_df)
 
-#st.subheader("Multiselect")
+# st.subheader("Multiselect")
 course_list = [title for title in raw_df.index]
 
-#st.subheader("Tabella Orari")
+# st.subheader("Tabella Orari")
 
-#st.write(df_cal)
+# st.write(df_cal)
 
-#cal_md = df_cal.to_markdown(index=False)
-#st.markdown(cal_md)
+# cal_md = df_cal.to_markdown(index=False)
+# st.markdown(cal_md)
 
 
 def set_state(i):
     st.session_state.stage = i
 
-def generate_ttxls(df_cal, tt_filename):
-    df_cal.to_excel(tt_filename, sheet_name='Timetable', header=True, index=True)
 
-if 'stage' not in st.session_state:
-    st.session_state.stage = 0
+def generate_ttxls(df_cal, tt_filename):
+    df_cal.to_excel(tt_filename, sheet_name="Timetable", header=True, index=True)
+
+def generate_ical(input_df, ical_filename, semester_start, semester_end):
+    cal = get_cal(input_df, semester_start, semester_end)
+    with open(ical_filename, 'wb') as f:
+        f.write(cal.to_ical())
+
+if "stage" not in st.session_state:
+    st.session_state.stage = 'initial'
 
 options = st.multiselect(
     "Choose the courses you would like to include in your timetable.", course_list
 )
 
 my_df = raw_df.loc[options]
-df_cal = get_timetable(my_df.reset_index(drop=False))
 
-st.button(':boom: Generate table', on_click=set_state, args=[1])
+tab1, tab2 = st.tabs(["Excel", "iCal"])
 
-if st.session_state.stage == 1:
-    st.table(df_cal)
-    st.button(':bar_chart: Generate Timetable Excel', on_click=set_state, args=[2])
+with tab1:
+    st.header("Generate Excel Table")
+    df_cal = get_timetable(my_df.reset_index(drop=False))
 
-if st.session_state.stage >= 2:
-    generate_ttxls(df_cal, 'timetable.xlsx')
-    with open('timetable.xlsx', 'rb') as f:
-        st.download_button(':arrow_down: Download Timetable Excel', f, 'timetable.xlsx')
+    st.button(":boom: Generate table", on_click=set_state, args=['excel1'])
+
+    if st.session_state.stage == 'excel1':
+        st.table(df_cal)
+        st.button(":bar_chart: Generate Timetable Excel", on_click=set_state, args=['excel2'])
+
+    if st.session_state.stage == 'excel2':
+        generate_ttxls(df_cal, "timetable.xlsx")
+        with open("timetable.xlsx", "rb") as f:
+            st.download_button(":arrow_down: Download Timetable Excel", f, "timetable.xlsx")
+
+with tab2:
+    st.header("Generate iCal file")
+    st.button(":boom: Generate iCal file", on_click=set_state, args=['ical1'])
+
+    if st.session_state.stage == 'ical1':
+        generate_ical(my_df.reset_index(drop=False), 'semester_calendar.ics', semester_start, semester_end)
+        with open("semester_calendar.ics", "rb") as f:
+            st.download_button(":calendar: Download iCal file", f, "semester_calendar.ics")
