@@ -121,6 +121,7 @@ rooms = [
     "Aula17A",
     "Aula17B",
     "Aula17C",
+    "LabCalc",
     "LabCalcA",
     "LabCalcB",
     "LabCalcC",
