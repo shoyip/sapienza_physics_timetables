@@ -1,28 +1,79 @@
 import streamlit as st
 
 import requests
-import math as mt
 from bs4 import BeautifulSoup
 import pandas as pd
 from io import StringIO
 import re
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import icalendar as ical
+
+def load_data(data_url):
+    p = requests.get(data_url)
+    s = BeautifulSoup(p.content, "html.parser")
+
+    cohorts = ["T1", "T2", "T3", "M1", "M2"]
+    dfs = {}
+    for cohort in cohorts:
+        r = s.find("a", {"name": cohort})
+        ht = str(r.findNext("table"))
+        cdf = pd.read_html(StringIO(ht), header=0)[0]
+        cdf["Title"] = cdf.Insegnamento + " - " + cdf.Docente + " [" + cohort + "]"
+        cdf.drop(columns=["Insegnamento", "Docente"], inplace=True)
+        dfs[cohort] = cdf
+
+    df = pd.concat([df for df in dfs.values()], axis=0)
+
+    return df
+
+# visit "orario delle lezioni" website and check for updated html page of timetables
+url = 'https://www.phys.uniroma1.it/fisica/didattica/orario-delle-lezioni'
+p = requests.get(url)
+s = BeautifulSoup(p.content, 'html.parser')
+updated_url = s.find('strong', string="Orario delle lezioni")\
+  .parent\
+  .next_sibling\
+  .next_sibling\
+  .find('a')['href']
+last_update = s.find('strong', string="Orario delle lezioni")\
+  .parent\
+  .next_sibling\
+  .next_sibling\
+  .next_sibling\
+  .next_sibling\
+  .text[1:]
+
+
+raw_df = load_data(updated_url)
+raw_df.set_index("Title", inplace=True)
 
 st.set_page_config(page_title="Physics Timetables at Sapienza")
 
-st.title("Timetables - Department of Physics")
+with st.sidebar:
+    st.markdown(
+        """
+        ![Photo of the Department of Physics, Marconi Building](https://i.imgur.com/WJ4D8j2.jpeg)
 
-st.markdown(
+    # :hourglass_flowing_sand: Timetables - Department of Physics
+
+    ![Sapienza University of Rome logo](https://www.phys.uniroma1.it/fisica/sites/all/themes/sapienza_bootstrap/logo.png)
+
+    This app allows you to generate **timetables** for
+    **Sapienza** University of Rome lectures at the **Department of Physics**.
+    The app is maintained by [Shoichi Yip](https://github.com/shoyip).
+    The code is available on a [Github repository](https://github.com/shoyip/sapienza_physics_timetables).
+
+    :bar_chart: In the **Excel** tab you can generate an Excel table, that you can
+    download and subsequently modify for printout.
+
+    :calendar: In the **iCal** tab you can generate an iCal file that you can directly
+    import in Google Calendar or any similar software.
     """
-![Sapienza University of Rome logo](https://www.phys.uniroma1.it/fisica/sites/all/themes/sapienza_bootstrap/logo.png)
+    )
 
-This app allows you to generate timetables for
-Sapienza University of Rome lectures at the Department of
-Physics. It is currently updated to [the 21/09 version](https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html).
-The app is maintained by [Shoichi Yip](https://github.com/shoyip).
-"""
-)
+    st.write(f":link: You can find the original updated timetable webpage at [this address]({updated_url}).")
+
+    st.write(last_update)
 
 
 def to_date(date_string):
@@ -79,25 +130,6 @@ rooms = [
 ]
 
 
-def load_data(data_url):
-    p = requests.get(data_url)
-    s = BeautifulSoup(p.content, "html.parser")
-
-    cohorts = ["T1", "T2", "T3", "M1", "M2"]
-    dfs = {}
-    for cohort in cohorts:
-        r = s.find("a", {"name": cohort})
-        ht = str(r.findNext("table"))
-        cdf = pd.read_html(StringIO(ht), header=0)[0]
-        cdf["Title"] = cdf.Insegnamento + " - " + cdf.Docente + " [" + cohort + "]"
-        cdf.drop(columns=["Insegnamento", "Docente"], inplace=True)
-        dfs[cohort] = cdf
-
-    df = pd.concat([df for df in dfs.values()], axis=0)
-
-    return df
-
-
 def clean_str(tt_str):
     l = {" (a)": "A", " (b)": "B", " (c)": "C"}
     pattern = "|".join(sorted(re.escape(k) for k in l))
@@ -136,7 +168,6 @@ def get_ttrecords(tt_string):
 def get_reclist(input_df):
     # transform raw df in list of records
     #input_df.reset_index(drop=False, inplace=True)
-    st.write(input_df)
     reclist = list(
         pd.concat(
             [
@@ -250,13 +281,6 @@ def get_timetable(input_df):
         8:20, days_of_week[0:5]
     ]  # return only meaningful days and hours
 
-
-raw_df = load_data(
-    # "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/Orario_I_semestre_23_24.html"
-    "https://www.phys.uniroma1.it/fisica/sites/default/files/allegati/_orario_I%20semestre_fs2324-v23_2.html"
-)
-raw_df.set_index("Title", inplace=True)
-
 # st.subheader("Data")
 # st.write(raw_df)
 
@@ -286,13 +310,15 @@ def generate_ical(input_df, ical_filename, semester_start, semester_end):
 if "stage" not in st.session_state:
     st.session_state.stage = 'initial'
 
+st.header("Select your courses of choice")
+
 options = st.multiselect(
     "Choose the courses you would like to include in your timetable.", course_list
 )
 
 my_df = raw_df.loc[options]
 
-tab1, tab2 = st.tabs(["Excel", "iCal"])
+tab1, tab2 = st.tabs([":bar_chart: Excel", ":calendar: iCal"])
 
 with tab1:
     st.header("Generate Excel Table")
