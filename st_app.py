@@ -225,8 +225,6 @@ def get_cal(input_df, semester_start, semester_end):
                 start_dt = event_date + timedelta(hours=start_hour)
                 end_dt = event_date + timedelta(hours=end_hour)
 
-                st.write(entry_option)
-                print(entry_option)
                 if ("end_date" in entry_option):
                     if (entry_option["end_date"] < semester_end):
                         end_recurrence = entry_option["end_date"]
@@ -242,8 +240,6 @@ def get_cal(input_df, semester_start, semester_end):
                 ev.add("location", entry_option["room"])
                 ev.add("dtstart", start_dt)
                 ev.add("dtend", end_dt)
-                st.write(end_recurrence)
-                print(end_recurrence)
                 ev.add("rrule", {"freq": "weekly", "until": end_recurrence})
                 # exdates should have the SAME format of dtstart and same HOUR as well (doesn't work)
                 # for festivity in festivities:
