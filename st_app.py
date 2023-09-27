@@ -7,6 +7,7 @@ from io import StringIO
 import re
 from datetime import datetime, timedelta
 import icalendar as ical
+from pytz import timezone
 
 def load_data(data_url):
     p = requests.get(data_url)
@@ -77,7 +78,7 @@ with st.sidebar:
 
 
 def to_date(date_string):
-    return datetime.strptime(date_string, "%d/%m/%Y")
+    return datetime.strptime(date_string, "%d/%m/%Y").replace(tzinfo=timezone("Europe/Rome"))
 
 
 semester_start = to_date("25/09/2023")
@@ -146,10 +147,10 @@ def get_ttrecords(tt_string):
     nxt_start, nxt_end = False, False
     for word in tt_string.split(" "):
         if nxt_start:
-            records[-1]["start_date"] = datetime.strptime(word, "%d/%m/%y")
+            records[-1]["start_date"] = datetime.strptime(word, "%d/%m/%y").replace(tzinfo=timezone("Europe/Rome"))
             nxt_start = False
         elif nxt_end:
-            records[-1]["end_date"] = datetime.strptime(word, "%d/%m/%y")
+            records[-1]["end_date"] = datetime.strptime(word, "%d/%m/%y").replace(tzinfo=timezone("Europe/Rome"))
             nxt_end = False
         elif word in rooms:
             records.append({"room": word})
@@ -224,9 +225,13 @@ def get_cal(input_df, semester_start, semester_end):
                 start_dt = event_date + timedelta(hours=start_hour)
                 end_dt = event_date + timedelta(hours=end_hour)
 
+                st.write(entry_option)
+                print(entry_option)
                 if ("end_date" in entry_option):
                     if (entry_option["end_date"] < semester_end):
                         end_recurrence = entry_option["end_date"]
+                    else:
+                        end_recurrence = semester_end
                 else:
                     end_recurrence = semester_end
 
@@ -237,6 +242,8 @@ def get_cal(input_df, semester_start, semester_end):
                 ev.add("location", entry_option["room"])
                 ev.add("dtstart", start_dt)
                 ev.add("dtend", end_dt)
+                st.write(end_recurrence)
+                print(end_recurrence)
                 ev.add("rrule", {"freq": "weekly", "until": end_recurrence})
                 # exdates should have the SAME format of dtstart and same HOUR as well (doesn't work)
                 # for festivity in festivities:
